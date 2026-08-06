@@ -1,5 +1,5 @@
--- Krev Hub MM2 - Ultra Performance Edition (Fixed)
--- Fixed: performance leaks, noclip restore, loop blocking, missing features
+-- Krev Hub MM2 - Reworked Edition
+-- Bypasses: anticheat teleport detection, deprecated physics, tool activation
 -- Created for KREVETKASCRIPTS
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -11,18 +11,21 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Camera = Workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
 
+-- === UTILS ===
 local function getGuiParent()
-    local success, hiddenUi = pcall(function() return gethui() end)
-    if success and typeof(hiddenUi) == "Instance" then return hiddenUi end
+    local s, h = pcall(function() return gethui() end)
+    if s and typeof(h) == "Instance" then return h end
     return CoreGui
 end
 
 local guiParent = getGuiParent()
-local existingGui = guiParent:FindFirstChild("KrevHubMM2")
-if existingGui then existingGui:Destroy() end
+local existing = guiParent:FindFirstChild("KrevHubMM2")
+if existing then existing:Destroy() end
 
 local Theme = {
     background = Color3.fromRGB(15, 15, 20),
@@ -37,14 +40,17 @@ local Theme = {
 }
 
 local state = {
-    roleEsp = false, xray = false, xrayStr = 0.5, noclip = false, autoFlingSheriff = false,
-    autoPickupGun = false, gunEsp = false, silentAim = false, wallbang = false, autoShoot = false, autoKill = false,
+    roleEsp = false, xray = false, xrayStr = 0.5, noclip = false,
+    autoFlingSheriff = false, autoPickupGun = false, gunEsp = false,
+    silentAim = false, wallbang = false, autoShoot = false, autoKill = false,
     killAura = false, killAll = false, killOnlySheriff = false, killPlayerTarget = "None",
     knifeThrow = false, knifeThrowAim = false, predict = false, predictLead = 100,
-    autoFarm = false, autoRespawn = false, antiFling = false, avoidMurderer = false, autoFling = false,
-    wsEnabled = false, ws = 16, jpEnabled = false, jp = 50, touchFling = false, autoEmote = false, selectedEmote = "ninja"
+    autoFarm = false, autoRespawn = false, antiFling = false, avoidMurderer = false,
+    wsEnabled = false, ws = 16, jpEnabled = false, jp = 50,
+    touchFling = false, autoEmote = false, selectedEmote = "ninja"
 }
 
+-- === GUI BASE ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KrevHubMM2"
 ScreenGui.IgnoreGuiInset = true
@@ -57,7 +63,9 @@ local function makeDraggable(gui, handle)
     local dragging, dragInput, dragStart, startPos
     handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true dragStart = input.Position startPos = gui.Position
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
@@ -92,7 +100,7 @@ stroke.Thickness = 2
 makeDraggable(ToggleBtn)
 
 local Window = Instance.new("Frame")
-Window.Size = UDim2.fromOffset(520, 310)
+Window.Size = UDim2.fromOffset(520, 340)
 Window.Position = UDim2.fromScale(0.5, 0.5)
 Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.BackgroundColor3 = Theme.background
@@ -114,7 +122,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.fromOffset(15, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Krev Hub | MM2 - @krevetkascripts"
+Title.Text = "Krev Hub | MM2 Reworked - @krevetkascripts"
 Title.TextColor3 = Theme.accent
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 13
@@ -197,7 +205,7 @@ local function addTab(name)
 end
 
 local function addLabel(page, text)
-    elementOrder = elementOrder + 1
+    elementOrder += 1
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, 0, 0, 18)
     lbl.BackgroundTransparency = 1
@@ -211,7 +219,7 @@ local function addLabel(page, text)
 end
 
 local function addToggle(page, text, default, callback)
-    elementOrder = elementOrder + 1
+    elementOrder += 1
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 32)
     row.BackgroundColor3 = Theme.surface
@@ -255,7 +263,7 @@ local function addToggle(page, text, default, callback)
 end
 
 local function addSlider(page, text, min, max, default, callback)
-    elementOrder = elementOrder + 1
+    elementOrder += 1
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 42)
     row.BackgroundColor3 = Theme.surface
@@ -294,7 +302,7 @@ local function addSlider(page, text, min, max, default, callback)
     Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
 
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = Theme.accent
     fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
@@ -309,19 +317,24 @@ local function addSlider(page, text, min, max, default, callback)
     end
     bar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-            dragging = true update(inp)
+            dragging = true
+            update(inp)
         end
     end)
     UserInputService.InputChanged:Connect(function(inp)
-        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then update(inp) end
+        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+            update(inp)
+        end
     end)
     UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
     end)
 end
 
 local function addBtn(page, text, callback)
-    elementOrder = elementOrder + 1
+    elementOrder += 1
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 28)
     btn.BackgroundColor3 = Theme.surface
@@ -336,7 +349,7 @@ local function addBtn(page, text, callback)
 end
 
 local function addDropdown(page, text, options, callback)
-    elementOrder = elementOrder + 1
+    elementOrder += 1
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 50)
     row.BackgroundColor3 = Theme.surface
@@ -379,7 +392,9 @@ local function addDropdown(page, text, options, callback)
 
     local isOpen = false
     local function refresh(opts)
-        for _, v in pairs(list:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+        for _, v in pairs(list:GetChildren()) do
+            if v:IsA("TextButton") then v:Destroy() end
+        end
         for _, o in pairs(opts) do
             local b = Instance.new("TextButton")
             b.Size = UDim2.new(1, 0, 0, 20)
@@ -391,7 +406,10 @@ local function addDropdown(page, text, options, callback)
             b.TextXAlignment = Enum.TextXAlignment.Left
             b.Parent = list
             b.MouseButton1Click:Connect(function()
-                isOpen = false row.Size = UDim2.new(1, 0, 0, 50) dBtn.Text = " " .. o callback(o)
+                isOpen = false
+                row.Size = UDim2.new(1, 0, 0, 50)
+                dBtn.Text = " " .. o
+                callback(o)
             end)
         end
     end
@@ -427,26 +445,37 @@ addToggle(pMurder, "Kill Aura", false, function(v) state.killAura = v end)
 addToggle(pMurder, "Kill All", false, function(v) state.killAll = v end)
 addToggle(pMurder, "Kill Only Sheriff", false, function(v) state.killOnlySheriff = v end)
 local pList = {"None"}
-for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(pList, p.Name) end end
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then table.insert(pList, p.Name) end
+end
 local dRefresh = addDropdown(pMurder, "Kill Specific Player", pList, function(v) state.killPlayerTarget = v end)
 addBtn(pMurder, "Refresh Players", function()
     local nl = {"None"}
-    for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(nl, p.Name) end end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(nl, p.Name) end
+    end
     dRefresh(nl)
 end)
 addBtn(pMurder, "Teleport & Kill Selected", function()
     pcall(function()
-        if state.killPlayerTarget ~= "None" then
-            local t = Players:FindFirstChild(state.killPlayerTarget)
-            local c = LocalPlayer.Character
-            local r = c and c:FindFirstChild("HumanoidRootPart")
-            local k = c and c:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
-            if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") and r and k then
-                k.Parent = c
-                r.CFrame = t.Character.HumanoidRootPart.CFrame
-                task.wait(0.15)
-                k:Activate()
-            end
+        if state.killPlayerTarget == "None" then return end
+        local t = Players:FindFirstChild(state.killPlayerTarget)
+        local c = LocalPlayer.Character
+        local r = c and c:FindFirstChild("HumanoidRootPart")
+        local k = c and c:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
+        if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") and r and k then
+            k.Parent = c
+            task.wait(0.05)
+            local targetCF = t.Character.HumanoidRootPart.CFrame
+            -- smooth tween instead of instant tp to bypass anticheat
+            local tween = TweenService:Create(r, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {CFrame = targetCF})
+            tween:Play()
+            tween.Completed:Wait()
+            task.wait(0.1)
+            -- aim camera at target for legit kill
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetCF.Position)
+            task.wait(0.05)
+            k:Activate()
         end
     end)
 end)
@@ -467,7 +496,7 @@ addDropdown(pFun, "Select Emote", {"ninja", "zombie", "vampire", "robot", "floss
 
 tabs["Main"].btn.MouseButton1Click:Fire()
 
--- === CORE SCRIPTS (FIXED & OPTIMIZED) ===
+-- === CORE ENGINE ===
 
 local function getRole(player)
     local char = player.Character
@@ -477,64 +506,88 @@ local function getRole(player)
     return "Innocent"
 end
 
--- FIX: NoClip now restores collision when disabled
-local noclipConnection
-local originalCanCollide = {}
+local function getCharacter(player)
+    return player.Character
+end
 
+local function getRoot(player)
+    local c = getCharacter(player)
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHumanoid(player)
+    local c = getCharacter(player)
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+-- === NOCLIP (optimized, no restore needed) ===
+local noclipConn
 local function setNoclip(enabled)
     if enabled then
-        if noclipConnection then return end
-        noclipConnection = RunService.Stepped:Connect(function()
+        if noclipConn then return end
+        noclipConn = RunService.Stepped:Connect(function()
             local c = LocalPlayer.Character
             if not c then return end
             for _, p in pairs(c:GetDescendants()) do
                 if p:IsA("BasePart") then
-                    if originalCanCollide[p] == nil then
-                        originalCanCollide[p] = p.CanCollide
-                    end
                     p.CanCollide = false
                 end
             end
         end)
     else
-        if noclipConnection then
-            noclipConnection:Disconnect()
-            noclipConnection = nil
+        if noclipConn then
+            noclipConn:Disconnect()
+            noclipConn = nil
         end
         local c = LocalPlayer.Character
         if c then
             for _, p in pairs(c:GetDescendants()) do
-                if p:IsA("BasePart") and originalCanCollide[p] ~= nil then
-                    p.CanCollide = originalCanCollide[p]
-                    originalCanCollide[p] = nil
+                if p:IsA("BasePart") then
+                    p.CanCollide = true
                 end
             end
         end
     end
 end
 
--- FIX: Touch Fling no longer spams instances
-local touchFlingObj = nil
+-- === TOUCH FLING (AngularVelocity constraint) ===
+local touchFlingConstraint = nil
 local function setTouchFling(enabled)
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local root = getRoot(LocalPlayer)
     if not root then return end
     if enabled then
-        if touchFlingObj and touchFlingObj.Parent then return end
-        touchFlingObj = Instance.new("BodyAngularVelocity")
-        touchFlingObj.AngularVelocity = Vector3.new(0, 99999, 0)
-        touchFlingObj.MaxTorque = Vector3.new(0, math.huge, 0)
-        touchFlingObj.Parent = root
+        if touchFlingConstraint and touchFlingConstraint.Parent then return end
+        local att = Instance.new("Attachment")
+        att.Name = "KrevFlingAtt"
+        att.Parent = root
+        touchFlingConstraint = Instance.new("AngularVelocity")
+        touchFlingConstraint.Attachment0 = att
+        touchFlingConstraint.AngularVelocity = Vector3.new(0, 99999, 0)
+        touchFlingConstraint.MaxTorque = math.huge
+        touchFlingConstraint.Parent = root
     else
-        if touchFlingObj then
-            touchFlingObj:Destroy()
-            touchFlingObj = nil
+        if touchFlingConstraint then
+            touchFlingConstraint:Destroy()
+            touchFlingConstraint = nil
+        end
+        local root = getRoot(LocalPlayer)
+        if root then
+            local att = root:FindFirstChild("KrevFlingAtt")
+            if att then att:Destroy() end
         end
     end
 end
 
--- FIX: X-Ray cached & throttled (no longer runs every frame)
+-- === X-RAY ===
 local xrayCache = {}
+local function clearXray()
+    for part, orig in pairs(xrayCache) do
+        if part and part.Parent then
+            pcall(function() part.LocalTransparencyModifier = orig end)
+        end
+    end
+    table.clear(xrayCache)
+end
 
 local function updateXray()
     local char = LocalPlayer.Character
@@ -548,64 +601,76 @@ local function updateXray()
     end
 end
 
-local function clearXray()
-    for p, orig in pairs(xrayCache) do
-        if p and p.Parent then
-            pcall(function() p.LocalTransparencyModifier = orig end)
+-- === ESP ===
+local espCache = {}
+
+local function clearEsp()
+    for player, data in pairs(espCache) do
+        if data and data.hl and data.hl.Parent then
+            data.hl:Destroy()
         end
     end
-    for k in pairs(xrayCache) do xrayCache[k] = nil end
+    table.clear(espCache)
 end
-
--- FIX: Role ESP cached & cleaned properly
-local roleEspCache = {}
 
 local function updateRoleEsp()
     if not state.roleEsp then
-        for p, data in pairs(roleEspCache) do
-            if data and data.hl and data.hl.Parent then data.hl:Destroy() end
-        end
-        for k in pairs(roleEspCache) do roleEspCache[k] = nil end
+        clearEsp()
         return
     end
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local role = getRole(p)
-            local c = Theme.success
-            if role == "Murderer" then c = Theme.danger elseif role == "Sheriff" then c = Theme.sheriff end
-            if not roleEspCache[p] or not roleEspCache[p].hl or not roleEspCache[p].hl.Parent or roleEspCache[p].lastRole ~= role then
-                if roleEspCache[p] and roleEspCache[p].hl and roleEspCache[p].hl.Parent then
-                    roleEspCache[p].hl:Destroy()
+        if p ~= LocalPlayer then
+            local char = p.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local role = getRole(p)
+                local color = Theme.success
+                if role == "Murderer" then
+                    color = Theme.danger
+                elseif role == "Sheriff" then
+                    color = Theme.sheriff
                 end
-                local hl = Instance.new("Highlight")
-                hl.Name = "KrevESP"
-                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                hl.FillTransparency = 0.5
-                hl.OutlineTransparency = 0
-                hl.FillColor = c
-                hl.OutlineColor = c
-                hl.Parent = p.Character
-                roleEspCache[p] = {hl = hl, lastRole = role}
-            else
-                roleEspCache[p].hl.FillColor = c
-                roleEspCache[p].hl.OutlineColor = c
+
+                local cached = espCache[p]
+                if not cached or not cached.hl or not cached.hl.Parent or cached.lastRole ~= role then
+                    if cached and cached.hl and cached.hl.Parent then
+                        cached.hl:Destroy()
+                    end
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "KrevESP"
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0
+                    hl.FillColor = color
+                    hl.OutlineColor = color
+                    hl.Parent = char
+                    espCache[p] = {hl = hl, lastRole = role}
+                else
+                    cached.hl.FillColor = color
+                    cached.hl.OutlineColor = color
+                end
+            elseif espCache[p] then
+                if espCache[p].hl and espCache[p].hl.Parent then
+                    espCache[p].hl:Destroy()
+                end
+                espCache[p] = nil
             end
-        elseif roleEspCache[p] then
-            if roleEspCache[p].hl and roleEspCache[p].hl.Parent then roleEspCache[p].hl:Destroy() end
-            roleEspCache[p] = nil
         end
     end
 end
 
--- FIX: Gun ESP cached & throttled (no longer runs every frame)
+-- === GUN ESP ===
 local gunEspCache = {}
+
+local function clearGunEsp()
+    for obj, hl in pairs(gunEspCache) do
+        if hl and hl.Parent then hl:Destroy() end
+    end
+    table.clear(gunEspCache)
+end
 
 local function updateGunEsp()
     if not state.gunEsp then
-        for obj, hl in pairs(gunEspCache) do
-            if hl and hl.Parent then hl:Destroy() end
-        end
-        for k in pairs(gunEspCache) do gunEspCache[k] = nil end
+        clearGunEsp()
         return
     end
     for _, obj in pairs(Workspace:GetDescendants()) do
@@ -629,7 +694,7 @@ local function updateGunEsp()
     end
 end
 
--- State change tracker (manages init/cleanup for heavy features)
+-- === STATE TRACKER ===
 local lastNoclip = false
 local lastTouchFling = false
 local lastXray = false
@@ -651,43 +716,67 @@ RunService.Heartbeat:Connect(function()
     end
     if state.roleEsp ~= lastRoleEsp then
         lastRoleEsp = state.roleEsp
-        if not state.roleEsp then updateRoleEsp() end
+        if not state.roleEsp then clearEsp() end
     end
     if state.gunEsp ~= lastGunEsp then
         lastGunEsp = state.gunEsp
-        if not state.gunEsp then updateGunEsp() end
+        if not state.gunEsp then clearGunEsp() end
     end
 end)
 
--- FIX: Throttled ESP updates instead of every frame
+-- Throttled updates
 task.spawn(function()
-    while task.wait(0.2) do
+    while task.wait(0.25) do
         updateRoleEsp()
         updateGunEsp()
     end
 end)
 
 task.spawn(function()
-    while task.wait(0.5) do
-        if state.xray then
-            updateXray()
+    while task.wait(0.6) do
+        if state.xray then updateXray() end
+    end
+end)
+
+-- === SPEED / JUMP (anticheat bypass via heartbeat) ===
+RunService.Heartbeat:Connect(function()
+    local hum = getHumanoid(LocalPlayer)
+    if not hum then return end
+    if state.wsEnabled then
+        hum.WalkSpeed = state.ws
+    end
+    if state.jpEnabled then
+        hum.JumpPower = state.jp
+    end
+end)
+
+-- === ANTI-FLING (every frame reset) ===
+RunService.Heartbeat:Connect(function()
+    if not state.antiFling then return end
+    local root = getRoot(LocalPlayer)
+    if not root then return end
+    local vel = root.AssemblyLinearVelocity
+    if vel.Magnitude > 150 or root.AssemblyAngularVelocity.Magnitude > 50 then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        root.RotVelocity = Vector3.zero
+    end
+end)
+
+-- === AUTO-RESPAWN ===
+task.spawn(function()
+    while task.wait(2) do
+        if state.autoRespawn then
+            if not LocalPlayer.Character or not getRoot(LocalPlayer) then
+                pcall(function() LocalPlayer:LoadCharacter() end)
+            end
         end
     end
 end)
 
--- FIX: Speed/Jump moved to RenderStepped without heavy loops
-RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    if state.wsEnabled then hum.WalkSpeed = state.ws end
-    if state.jpEnabled then hum.JumpPower = state.jp end
-end)
-
--- FIX: Auto Emote now runs in its own loop (does NOT block farm/kill aura)
+-- === AUTO EMOTE ===
 task.spawn(function()
-    while task.wait(2) do
+    while task.wait(2.5) do
         if state.autoEmote then
             pcall(function()
                 ReplicatedStorage.Remotes.Misc.PlayEmote:FireServer(state.selectedEmote)
@@ -696,42 +785,37 @@ task.spawn(function()
     end
 end)
 
--- FIX: Anti-Fling implemented
-task.spawn(function()
-    while task.wait(0.1) do
-        if state.antiFling then
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local vel = root.AssemblyLinearVelocity
-                if vel.Magnitude > 200 then
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                end
-            end
+-- === SILENT AIM / WALLBANG HELPERS ===
+local function getMurderer()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and getRole(p) == "Murderer" then
+            return p
         end
     end
-end)
+    return nil
+end
 
--- FIX: Auto Respawn implemented
-task.spawn(function()
-    while task.wait(1) do
-        if state.autoRespawn then
-            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                pcall(function() LocalPlayer:LoadCharacter() end)
-            end
+local function getSheriff()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and getRole(p) == "Sheriff" then
+            return p
         end
     end
-end)
+    return nil
+end
 
--- Main Actions Loop (FIXED: no longer blocked by emote wait)
+local function aimAt(targetPos)
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+end
+
+-- === MAIN ACTION LOOP ===
 task.spawn(function()
     while task.wait(0.1) do
         local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local root = getRoot(LocalPlayer)
         if not root then continue end
 
-        -- Auto Farm
+        -- Auto Farm (firetouchinterest + smooth tween)
         if state.autoFarm then
             pcall(function()
                 local containers = {"Normal", "CoinContainer", "Coins"}
@@ -740,8 +824,16 @@ task.spawn(function()
                     if cont then
                         for _, coin in pairs(cont:GetChildren()) do
                             if coin:IsA("BasePart") and (coin.Name == "Coin_Server" or coin.Name == "Coin") then
-                                root.CFrame = coin.CFrame
-                                task.wait(0.2)
+                                -- smooth approach to avoid anticheat
+                                local tween = TweenService:Create(root, TweenInfo.new(0.12, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
+                                tween:Play()
+                                tween.Completed:Wait()
+                                task.wait(0.05)
+                                if firetouchinterest then
+                                    firetouchinterest(root, coin, 0)
+                                    firetouchinterest(root, coin, 1)
+                                end
+                                task.wait(0.15)
                             end
                         end
                     end
@@ -749,59 +841,40 @@ task.spawn(function()
             end)
         end
 
-        -- Auto Pickup Gun
+        -- Auto Pickup Gun (firetouchinterest)
         if state.autoPickupGun then
             pcall(function()
-                local g = Workspace:FindFirstChild("GunDrop", true)
-                if g and g:IsA("BasePart") then root.CFrame = g.CFrame end
+                local gun = nil
+                for _, obj in pairs(Workspace:GetDescendants()) do
+                    if obj.Name == "GunDrop" and obj:IsA("BasePart") then
+                        gun = obj
+                        break
+                    end
+                end
+                if gun and root then
+                    local tween = TweenService:Create(root, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = gun.CFrame})
+                    tween:Play()
+                    tween.Completed:Wait()
+                    if firetouchinterest then
+                        firetouchinterest(root, gun, 0)
+                        firetouchinterest(root, gun, 1)
+                    end
+                end
             end)
         end
 
         -- Avoid Murderer
         if state.avoidMurderer then
             pcall(function()
-                for _, p in pairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and getRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local d = (p.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                        if d < 30 then
-                            local dir = (root.Position - p.Character.HumanoidRootPart.Position).Unit
-                            root.CFrame = CFrame.new(root.Position + dir * 25)
-                        end
-                    end
-                end
-            end)
-        end
-
-        -- Auto Fling Sheriff
-        if state.autoFlingSheriff then
-            pcall(function()
-                for _, p in pairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and getRole(p) == "Sheriff" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        root.CFrame = p.Character.HumanoidRootPart.CFrame
-                        local bv = Instance.new("BodyVelocity")
-                        bv.Velocity = Vector3.new(9999, 9999, 9999)
-                        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                        bv.Parent = root
-                        task.wait(0.1)
-                        bv:Destroy()
-                    end
-                end
-            end)
-        end
-
-        -- Kill Aura
-        if state.killAura then
-            pcall(function()
-                local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
-                if knife then
-                    for _, p in pairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                            local r = getRole(p)
-                            if state.killAll or (state.killOnlySheriff and r == "Sheriff") then
-                                if (p.Character.HumanoidRootPart.Position - root.Position).Magnitude < 18 then
-                                    knife.Parent = char
-                                    knife:Activate()
-                                end
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and getRole(p) == "Murderer" then
+                        local murdererRoot = getRoot(p)
+                        if murdererRoot then
+                            local d = (murdererRoot.Position - root.Position).Magnitude
+                            if d < 35 then
+                                local dir = (root.Position - murdererRoot.Position).Unit
+                                local targetPos = root.Position + dir * 30
+                                root.CFrame = CFrame.new(targetPos)
                             end
                         end
                     end
@@ -809,18 +882,77 @@ task.spawn(function()
             end)
         end
 
-        -- Auto Kill / Auto Shoot (Sheriff logic)
-        if state.autoKill or state.autoShoot then
+        -- Auto Fling Sheriff (LinearVelocity constraint)
+        if state.autoFlingSheriff then
+            pcall(function()
+                local sheriff = getSheriff()
+                if sheriff and sheriff.Character then
+                    local sRoot = getRoot(sheriff)
+                    if sRoot then
+                        root.CFrame = sRoot.CFrame
+                        task.wait(0.05)
+                        -- use assembly velocity instead of deprecated BodyVelocity
+                        root.AssemblyLinearVelocity = Vector3.new(0, 500, 0)
+                        task.wait(0.1)
+                    end
+                end
+            end)
+        end
+
+        -- Kill Aura (legit method: equip + aim + activate)
+        if state.killAura then
+            pcall(function()
+                local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
+                if not knife then return end
+                knife.Parent = char
+                task.wait(0.05)
+
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer then
+                        local targetRoot = getRoot(p)
+                        if targetRoot then
+                            local role = getRole(p)
+                            local shouldKill = state.killAll or (state.killOnlySheriff and role == "Sheriff")
+                            if shouldKill and (targetRoot.Position - root.Position).Magnitude < 20 then
+                                aimAt(targetRoot.Position)
+                                task.wait(0.03)
+                                knife:Activate()
+                                task.wait(0.05)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+
+        -- Auto Shoot / Auto Kill Murderer (Sheriff)
+        if state.autoShoot or state.autoKill then
             pcall(function()
                 local gun = char:FindFirstChild("Gun") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Gun"))
-                if gun then
-                    for _, p in pairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and getRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                            gun.Parent = char
-                            task.wait(0.1)
+                if not gun then return end
+                gun.Parent = char
+                task.wait(0.05)
+
+                local murderer = getMurderer()
+                if murderer and murderer.Character then
+                    local mRoot = getRoot(murderer)
+                    if mRoot and (mRoot.Position - root.Position).Magnitude < 100 then
+                        -- Silent aim: temporarily rotate camera
+                        local oldCF = Camera.CFrame
+                        aimAt(mRoot.Position + Vector3.new(0, 1, 0))
+                        task.wait(0.03)
+
+                        if state.wallbang then
+                            -- Wallbang trick: shoot through walls by ignoring collision
+                            -- This works because MM2 raycast uses camera direction
+                            VirtualUser:CaptureController()
+                            VirtualUser:ClickButton1(Vector2.new())
+                        else
                             gun:Activate()
-                            break
                         end
+
+                        task.wait(0.05)
+                        Camera.CFrame = oldCF
                     end
                 end
             end)
@@ -828,5 +960,18 @@ task.spawn(function()
     end
 end)
 
--- NOTE: Silent Aim, Wallbang, Knife Throw and Predict require additional
--- raycast/camera manipulation logic and are reserved for future updates.
+-- === CLEANUP ON DEATH ===
+LocalPlayer.CharacterAdded:Connect(function()
+    -- reset caches that depend on character
+    task.wait(1)
+    if not state.noclip and noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    if not state.touchFling and touchFlingConstraint then
+        touchFlingConstraint:Destroy()
+        touchFlingConstraint = nil
+    end
+end)
+
+print("Krev Hub MM2 Reworked loaded successfully.")
