@@ -1,6 +1,5 @@
 -- Krev Hub MM2 - Delta / Velocity Edition
 -- Compatible: Delta, Velocity, Codex, Arceus X, Trigon (Mobile)
--- Removed: firetouchinterest, VirtualUser, table.clear, Vector3.zero, +=, continue, gethui()
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -15,9 +14,18 @@ local Camera = Workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
 
--- Cleanup old
+-- Безопасный поиск родителя для GUI (Mobile Fix)
+local guiParent
+local success, res = pcall(function() return gethui() end)
+if success and res then 
+    guiParent = res 
+else 
+    guiParent = CoreGui 
+end
+
 pcall(function()
-    local old = CoreGui:FindFirstChild("KrevHubMM2")
+    local old = guiParent:FindFirstChild("KrevHubMM2")
+    if not old then old = LocalPlayer.PlayerGui:FindFirstChild("KrevHubMM2") end
     if old then old:Destroy() end
 end)
 
@@ -49,7 +57,12 @@ ScreenGui.Name = "KrevHubMM2"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = CoreGui
+
+local function setGuiParent()
+    local success2, _ = pcall(function() ScreenGui.Parent = guiParent end)
+    if not success2 then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+end
+setGuiParent()
 
 local function makeDraggable(gui, handle)
     handle = handle or gui
@@ -464,7 +477,6 @@ addToggle(pMain, "Auto Fling Sheriff", false, function(v) state.autoFlingSheriff
 local pSheriff = addTab("Sheriff")
 addToggle(pSheriff, "Auto Pickup Gun", false, function(v) state.autoPickupGun = v end)
 addToggle(pSheriff, "Silent Aim", false, function(v) state.silentAim = v end)
-addToggle(pSheriff, "Wallbang", false, function(v) state.wallbang = v end)
 addToggle(pSheriff, "Auto Shoot", false, function(v) state.autoShoot = v end)
 addToggle(pSheriff, "Auto Kill Murderer", false, function(v) state.autoKill = v end)
 
@@ -495,12 +507,10 @@ addBtn(pMurder, "Teleport & Kill Selected", function()
             k.Parent = c
             task.wait(0.1)
             local targetCF = t.Character.HumanoidRootPart.CFrame
-            local tween = TweenService:Create(r, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {CFrame = targetCF})
-            tween:Play()
-            tween.Completed:Wait()
+            r.CFrame = targetCF * CFrame.new(0, 0, 3)
+            task.wait(0.15)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetCF.Position)
             task.wait(0.1)
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetCF.Position)
-            task.wait(0.05)
             k:Activate()
         end
     end)
@@ -517,7 +527,7 @@ addSlider(pFun, "Speed Value", 16, 150, 16, function(v) state.ws = v end)
 addToggle(pFun, "Jump Power", false, function(v) state.jpEnabled = v end)
 addSlider(pFun, "Jump Value", 50, 200, 50, function(v) state.jp = v end)
 addToggle(pFun, "Touch Fling", false, function(v) state.touchFling = v end)
-addToggle(pFun, "Auto Emote (Server)", false, function(v) state.autoEmote = v end)
+addToggle(pFun, "Auto Emote", false, function(v) state.autoEmote = v end)
 addDropdown(pFun, "Select Emote", {"ninja", "zombie", "vampire", "robot", "floss", "zen"}, function(v) state.selectedEmote = v end)
 
 tabs["Main"].btn.MouseButton1Click:Fire()
@@ -572,7 +582,7 @@ local function setNoclip(enabled)
     end
 end
 
--- Touch Fling (BodyAngularVelocity - works on all mobile executors)
+-- Touch Fling
 local flingObj = nil
 local function setTouchFling(enabled)
     local root = getRoot(LocalPlayer)
@@ -707,7 +717,6 @@ local function updateGunEsp()
     end
 end
 
--- State tracker
 local lastNoclip = false
 local lastTouchFling = false
 local lastXray = false
@@ -737,7 +746,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Throttled visual updates (mobile friendly)
 task.spawn(function()
     while task.wait(0.5) do
         pcall(updateRoleEsp)
@@ -753,7 +761,6 @@ task.spawn(function()
     end
 end)
 
--- Speed / Jump (Heartbeat bypass)
 RunService.Heartbeat:Connect(function()
     local hum = getHum(LocalPlayer)
     if not hum then return end
@@ -765,7 +772,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Anti-Fling
 RunService.Heartbeat:Connect(function()
     if not state.antiFling then return end
     local root = getRoot(LocalPlayer)
@@ -778,7 +784,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Auto Respawn
 task.spawn(function()
     while task.wait(3) do
         if state.autoRespawn then
@@ -789,7 +794,6 @@ task.spawn(function()
     end
 end)
 
--- Auto Emote
 task.spawn(function()
     while task.wait(3) do
         if state.autoEmote then
@@ -800,7 +804,6 @@ task.spawn(function()
     end
 end)
 
--- Helpers
 local function getMurderer()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and getRole(p) == "Murderer" then
@@ -820,16 +823,15 @@ local function getSheriff()
 end
 
 local function aimAt(targetPos)
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
 end
 
--- Main Action Loop (Delta safe - no firetouchinterest, no VirtualUser)
 task.spawn(function()
     while task.wait(0.2) do
         local char = LocalPlayer.Character
         local root = getRoot(LocalPlayer)
         if root then
-            -- Auto Farm (Tween only, touch naturally)
+            
             if state.autoFarm then
                 pcall(function()
                     local containers = {"Normal", "CoinContainer", "Coins"}
@@ -837,11 +839,12 @@ task.spawn(function()
                         local cont = Workspace:FindFirstChild(cName)
                         if cont then
                             for _, coin in pairs(cont:GetChildren()) do
-                                if coin:IsA("BasePart") and (coin.Name == "Coin_Server" or coin.Name == "Coin") then
-                                    local tween = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
+                                if coin:IsA("BasePart") and (coin.Name == "Coin_Server" or coin.Name == "Coin") and coin.Transparency < 1 then
+                                    local tween = TweenService:Create(root, TweenInfo.new(0.4, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
                                     tween:Play()
                                     tween.Completed:Wait()
-                                    task.wait(0.2)
+                                    task.wait(0.1)
+                                    break
                                 end
                             end
                         end
@@ -849,7 +852,6 @@ task.spawn(function()
                 end)
             end
 
-            -- Auto Pickup Gun (Tween only)
             if state.autoPickupGun then
                 pcall(function()
                     local gun = nil
@@ -868,7 +870,6 @@ task.spawn(function()
                 end)
             end
 
-            -- Avoid Murderer
             if state.avoidMurderer then
                 pcall(function()
                     for _, p in ipairs(Players:GetPlayers()) do
@@ -887,7 +888,6 @@ task.spawn(function()
                 end)
             end
 
-            -- Auto Fling Sheriff (BodyVelocity for Delta)
             if state.autoFlingSheriff then
                 pcall(function()
                     local sheriff = getSheriff()
@@ -907,8 +907,7 @@ task.spawn(function()
                 end)
             end
 
-            -- Kill Aura
-            if state.killAura then
+            if state.killAura or state.killAll then
                 pcall(function()
                     local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
                     if not knife then return end
@@ -920,12 +919,20 @@ task.spawn(function()
                             local tRoot = getRoot(p)
                             if tRoot then
                                 local role = getRole(p)
-                                local shouldKill = state.killAll or (state.killOnlySheriff and role == "Sheriff")
-                                if shouldKill and (tRoot.Position - root.Position).Magnitude < 20 then
-                                    aimAt(tRoot.Position)
-                                    task.wait(0.05)
-                                    knife:Activate()
-                                    task.wait(0.05)
+                                local shouldKill = state.killAll or (state.killOnlySheriff and role == "Sheriff") or (state.killAura and role ~= "Murderer")
+                                
+                                if shouldKill then
+                                    if state.killAll and (tRoot.Position - root.Position).Magnitude > 20 then
+                                        root.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                                        task.wait(0.1)
+                                    end
+                                    
+                                    if (tRoot.Position - root.Position).Magnitude < 25 then
+                                        aimAt(tRoot.Position)
+                                        task.wait(0.05)
+                                        knife:Activate()
+                                        task.wait(0.05)
+                                    end
                                 end
                             end
                         end
@@ -933,7 +940,6 @@ task.spawn(function()
                 end)
             end
 
-            -- Auto Shoot / Auto Kill (Sheriff)
             if state.autoShoot or state.autoKill then
                 pcall(function()
                     local gun = char:FindFirstChild("Gun") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Gun"))
@@ -959,7 +965,6 @@ task.spawn(function()
     end
 end)
 
--- Cleanup on death
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
     if not state.noclip and noclipConn then
@@ -971,5 +976,3 @@ LocalPlayer.CharacterAdded:Connect(function()
         flingObj = nil
     end
 end)
-
-print("Krev Hub MM2 Delta Edition loaded.")
