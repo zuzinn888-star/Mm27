@@ -1,4 +1,4 @@
--- Krev Hub MM2 - Delta / Velocity Edition (Fixed Functions)
+-- Krev Hub MM2 - Delta / Velocity Edition (Fully Fixed & Optimized)
 -- Compatible: Delta, Velocity, Codex, Arceus X, Trigon (Mobile)
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -42,10 +42,10 @@ local Theme = {
 
 local state = {
     roleEsp = false, xray = false, xrayStr = 0.5, noclip = false, fly = false,
-    autoFlingSheriff = false, autoPickupGun = false, gunEsp = false,
-    silentAim = false, autoShoot = false, autoKill = false,
+    autoPickupGun = false, gunEsp = false,
+    autoShoot = false, autoKill = false,
     killAura = false, killAll = false, killOnlySheriff = false, killPlayerTarget = "None",
-    autoFarm = false, autoRespawn = false, antiFling = false, avoidMurderer = false,
+    autoFarm = false, antiFling = false, avoidMurderer = false,
     wsEnabled = false, ws = 50, jpEnabled = false, jp = 100,
     touchFling = false, selectedEmote = "ninja"
 }
@@ -441,7 +441,6 @@ addSlider(pMain, "Jump Value", 50, 250, 100, function(v) state.jp = v end)
 local pSheriff = addTab("Sheriff")
 addToggle(pSheriff, "Auto Pickup Gun", false, function(v) state.autoPickupGun = v end)
 addToggle(pSheriff, "Auto Shoot", false, function(v) state.autoShoot = v end)
-addToggle(pSheriff, "Auto Kill Murderer", false, function(v) state.autoKill = v end)
 
 local pMurder = addTab("Murder")
 addToggle(pMurder, "Kill Aura", false, function(v) state.killAura = v end)
@@ -485,7 +484,7 @@ addToggle(pFarm, "Avoid Murderer", false, function(v) state.avoidMurderer = v en
 addToggle(pFarm, "Anti-Fling", false, function(v) state.antiFling = v end)
 
 local pFun = addTab("Troll Fun")
-addToggle(pFun, "Touch Fling", false, function(v) state.touchFling = v end)
+addToggle(pFun, "Safe Touch Fling", false, function(v) state.touchFling = v end)
 addDropdown(pFun, "Select Emote", {"ninja", "zen", "zombie", "floss", "sit", "dab", "vampire", "robot"}, function(v) state.selectedEmote = v end)
 addBtn(pFun, "Play Emote", function()
     pcall(function()
@@ -652,7 +651,6 @@ RunService.Stepped:Connect(function()
             if vel.Magnitude > 150 or root.AssemblyAngularVelocity.Magnitude > 50 then
                 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                root.RotVelocity = Vector3.new(0, 0, 0)
             end
         end
     end
@@ -665,20 +663,14 @@ task.spawn(function()
     end
 end)
 
-local flingObj = nil
+-- Исправленный безопасный Touch Fling без крашей
 RunService.Heartbeat:Connect(function()
     if state.touchFling then
-        local root = getRoot(LocalPlayer)
-        if root and not flingObj then
-            flingObj = Instance.new("BodyAngularVelocity")
-            flingObj.AngularVelocity = Vector3.new(0, 99999, 0)
-            flingObj.MaxTorque = Vector3.new(0, math.huge, 0)
-            flingObj.Parent = root
-        end
-    else
-        if flingObj then
-            flingObj:Destroy()
-            flingObj = nil
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local vel = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = vel * 1.5 + Vector3.new(math.random(-50, 50), 250, math.random(-50, 50))
         end
     end
 end)
@@ -686,13 +678,6 @@ end)
 local function getMurderer()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and getRole(p) == "Murderer" then return p end
-    end
-    return nil
-end
-
-local function getSheriff()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and getRole(p) == "Sheriff" then return p end
     end
     return nil
 end
@@ -716,7 +701,7 @@ task.spawn(function()
                             for _, coin in pairs(cont:GetChildren()) do
                                 if coin:IsA("BasePart") and (coin.Name == "Coin_Server" or coin.Name == "Coin") and coin.Transparency < 1 then
                                     root.CFrame = coin.CFrame
-                                    task.wait(0.15)
+                                    task.wait(0.25)
                                     break
                                 end
                             end
@@ -759,25 +744,6 @@ task.spawn(function()
                 end)
             end
 
-            if state.autoFlingSheriff then
-                pcall(function()
-                    local sheriff = getSheriff()
-                    if sheriff then
-                        local sRoot = getRoot(sheriff)
-                        if sRoot then
-                            root.CFrame = sRoot.CFrame
-                            task.wait(0.05)
-                            local bv = Instance.new("BodyVelocity")
-                            bv.Velocity = Vector3.new(0, 500, 0)
-                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                            bv.Parent = root
-                            task.wait(0.15)
-                            bv:Destroy()
-                        end
-                    end
-                end)
-            end
-
             if state.killAura or state.killAll then
                 pcall(function()
                     local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
@@ -811,7 +777,7 @@ task.spawn(function()
                 end)
             end
 
-            if state.autoShoot or state.autoKill then
+            if state.autoShoot then
                 pcall(function()
                     local gun = char:FindFirstChild("Gun") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Gun"))
                     if not gun then return end
