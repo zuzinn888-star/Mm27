@@ -1,4 +1,4 @@
--- Krev Hub MM2 - Delta / Velocity Edition
+-- Krev Hub MM2 - Delta / Velocity Edition (Fixed Functions)
 -- Compatible: Delta, Velocity, Codex, Arceus X, Trigon (Mobile)
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -14,7 +14,6 @@ local Camera = Workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
 
--- Безопасный поиск родителя для GUI (Mobile Fix)
 local guiParent
 local success, res = pcall(function() return gethui() end)
 if success and res then 
@@ -42,27 +41,23 @@ local Theme = {
 }
 
 local state = {
-    roleEsp = false, xray = false, xrayStr = 0.5, noclip = false,
+    roleEsp = false, xray = false, xrayStr = 0.5, noclip = false, fly = false,
     autoFlingSheriff = false, autoPickupGun = false, gunEsp = false,
-    silentAim = false, wallbang = false, autoShoot = false, autoKill = false,
+    silentAim = false, autoShoot = false, autoKill = false,
     killAura = false, killAll = false, killOnlySheriff = false, killPlayerTarget = "None",
     autoFarm = false, autoRespawn = false, antiFling = false, avoidMurderer = false,
-    wsEnabled = false, ws = 16, jpEnabled = false, jp = 50,
-    touchFling = false, autoEmote = false, selectedEmote = "ninja"
+    wsEnabled = false, ws = 50, jpEnabled = false, jp = 100,
+    touchFling = false, selectedEmote = "ninja"
 }
 
--- === GUI ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KrevHubMM2"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local function setGuiParent()
-    local success2, _ = pcall(function() ScreenGui.Parent = guiParent end)
-    if not success2 then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
-end
-setGuiParent()
+pcall(function() ScreenGui.Parent = guiParent end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local function makeDraggable(gui, handle)
     handle = handle or gui
@@ -99,13 +94,10 @@ ToggleBtn.TextColor3 = Theme.accent
 ToggleBtn.Font = Enum.Font.GothamBlack
 ToggleBtn.TextSize = 24
 ToggleBtn.Parent = ScreenGui
-local tbCorner = Instance.new("UICorner")
-tbCorner.CornerRadius = UDim.new(1, 0)
-tbCorner.Parent = ToggleBtn
-local tbStroke = Instance.new("UIStroke")
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+local tbStroke = Instance.new("UIStroke", ToggleBtn)
 tbStroke.Color = Theme.accent
 tbStroke.Thickness = 2
-tbStroke.Parent = ToggleBtn
 makeDraggable(ToggleBtn)
 
 local Window = Instance.new("Frame")
@@ -115,12 +107,8 @@ Window.AnchorPoint = Vector2.new(0.5, 0.5)
 Window.BackgroundColor3 = Theme.background
 Window.Visible = false
 Window.Parent = ScreenGui
-local wCorner = Instance.new("UICorner")
-wCorner.CornerRadius = UDim.new(0, 8)
-wCorner.Parent = Window
-local wStroke = Instance.new("UIStroke")
-wStroke.Color = Theme.accent
-wStroke.Parent = Window
+Instance.new("UICorner", Window).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", Window).Color = Theme.accent
 
 ToggleBtn.MouseButton1Click:Connect(function() Window.Visible = not Window.Visible end)
 
@@ -128,9 +116,7 @@ local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 35)
 Header.BackgroundColor3 = Theme.panel
 Header.Parent = Window
-local hCorner = Instance.new("UICorner")
-hCorner.CornerRadius = UDim.new(0, 8)
-hCorner.Parent = Header
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 makeDraggable(Window, Header)
 
 local Title = Instance.new("TextLabel")
@@ -162,14 +148,10 @@ Sidebar.BackgroundColor3 = Theme.panel
 Sidebar.BorderSizePixel = 0
 Sidebar.ScrollBarThickness = 0
 Sidebar.Parent = Window
-local sLayout = Instance.new("UIListLayout")
+local sLayout = Instance.new("UIListLayout", Sidebar)
 sLayout.Padding = UDim.new(0, 5)
-sLayout.Parent = Sidebar
-local sPad = Instance.new("UIPadding")
-sPad.PaddingTop = UDim.new(0, 5)
-sPad.PaddingLeft = UDim.new(0, 5)
-sPad.PaddingRight = UDim.new(0, 5)
-sPad.Parent = Sidebar
+local sPad = Instance.new("UIPadding", Sidebar)
+sPad.PaddingTop, sPad.PaddingLeft, sPad.PaddingRight = UDim.new(0, 5), UDim.new(0, 5), UDim.new(0, 5)
 
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, -120, 1, -35)
@@ -192,9 +174,7 @@ local function addTab(name)
     btn.TextSize = 12
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.Parent = Sidebar
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 4)
-    bCorner.Parent = btn
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 
     local page = Instance.new("ScrollingFrame")
     page.Size = UDim2.new(1, -16, 1, -16)
@@ -206,10 +186,9 @@ local function addTab(name)
     page.CanvasSize = UDim2.new()
     page.Visible = false
     page.Parent = Content
-    local pLayout = Instance.new("UIListLayout")
+    local pLayout = Instance.new("UIListLayout", page)
     pLayout.Padding = UDim.new(0, 6)
     pLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    pLayout.Parent = page
 
     tabs[name] = {btn = btn, page = page}
 
@@ -247,9 +226,7 @@ local function addToggle(page, text, default, callback)
     row.BackgroundColor3 = Theme.surface
     row.LayoutOrder = elementOrder
     row.Parent = page
-    local rCorner = Instance.new("UICorner")
-    rCorner.CornerRadius = UDim.new(0, 6)
-    rCorner.Parent = row
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -50, 1, 0)
@@ -268,18 +245,14 @@ local function addToggle(page, text, default, callback)
     btn.BackgroundColor3 = default and Theme.accent or Color3.fromRGB(50, 50, 60)
     btn.Text = ""
     btn.Parent = row
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(1, 0)
-    btnCorner.Parent = btn
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
     local knob = Instance.new("Frame")
     knob.Size = UDim2.fromOffset(14, 14)
     knob.Position = UDim2.new(default and 1 or 0, default and -16 or 2, 0.5, -7)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     knob.Parent = btn
-    local kCorner = Instance.new("UICorner")
-    kCorner.CornerRadius = UDim.new(1, 0)
-    kCorner.Parent = knob
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
     local val = default
     btn.MouseButton1Click:Connect(function()
@@ -297,9 +270,7 @@ local function addSlider(page, text, min, max, default, callback)
     row.BackgroundColor3 = Theme.surface
     row.LayoutOrder = elementOrder
     row.Parent = page
-    local rCorner = Instance.new("UICorner")
-    rCorner.CornerRadius = UDim.new(0, 6)
-    rCorner.Parent = row
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -50, 0, 20)
@@ -329,17 +300,13 @@ local function addSlider(page, text, min, max, default, callback)
     bar.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     bar.Text = ""
     bar.Parent = row
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(1, 0)
-    barCorner.Parent = bar
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = Theme.accent
     fill.Parent = bar
-    local fCorner = Instance.new("UICorner")
-    fCorner.CornerRadius = UDim.new(1, 0)
-    fCorner.Parent = fill
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
     local dragging = false
     local function update(inp)
@@ -378,9 +345,7 @@ local function addBtn(page, text, callback)
     btn.TextSize = 12
     btn.LayoutOrder = elementOrder
     btn.Parent = page
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     btn.MouseButton1Click:Connect(callback)
 end
 
@@ -392,9 +357,7 @@ local function addDropdown(page, text, options, callback)
     row.LayoutOrder = elementOrder
     row.ClipsDescendants = true
     row.Parent = page
-    local rCorner = Instance.new("UICorner")
-    rCorner.CornerRadius = UDim.new(0, 6)
-    rCorner.Parent = row
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -16, 0, 20)
@@ -417,9 +380,7 @@ local function addDropdown(page, text, options, callback)
     dBtn.TextSize = 11
     dBtn.TextXAlignment = Enum.TextXAlignment.Left
     dBtn.Parent = row
-    local dCorner = Instance.new("UICorner")
-    dCorner.CornerRadius = UDim.new(0, 4)
-    dCorner.Parent = dBtn
+    Instance.new("UICorner", dBtn).CornerRadius = UDim.new(0, 4)
 
     local list = Instance.new("ScrollingFrame")
     list.Size = UDim2.new(1, -20, 0, 70)
@@ -428,8 +389,7 @@ local function addDropdown(page, text, options, callback)
     list.BorderSizePixel = 0
     list.ScrollBarThickness = 2
     list.Parent = row
-    local lLayout = Instance.new("UIListLayout")
-    lLayout.Parent = list
+    Instance.new("UIListLayout", list)
 
     local isOpen = false
     local function refresh(opts)
@@ -463,20 +423,23 @@ local function addDropdown(page, text, options, callback)
     return refresh
 end
 
--- === TABS ===
 local pMain = addTab("Main")
 addLabel(pMain, "Visuals")
 addToggle(pMain, "Enable Role ESP", false, function(v) state.roleEsp = v end)
 addToggle(pMain, "Gun ESP", false, function(v) state.gunEsp = v end)
 addToggle(pMain, "X-Ray", false, function(v) state.xray = v end)
 addSlider(pMain, "X-Ray Strength", 10, 100, 50, function(v) state.xrayStr = v / 100 end)
+
 addLabel(pMain, "Movement")
 addToggle(pMain, "No Clip", false, function(v) state.noclip = v end)
-addToggle(pMain, "Auto Fling Sheriff", false, function(v) state.autoFlingSheriff = v end)
+addToggle(pMain, "Fly (Mobile Fix)", false, function(v) state.fly = v end)
+addToggle(pMain, "Walk Speed", false, function(v) state.wsEnabled = v end)
+addSlider(pMain, "Speed Value", 16, 150, 50, function(v) state.ws = v end)
+addToggle(pMain, "Jump Power", false, function(v) state.jpEnabled = v end)
+addSlider(pMain, "Jump Value", 50, 250, 100, function(v) state.jp = v end)
 
 local pSheriff = addTab("Sheriff")
 addToggle(pSheriff, "Auto Pickup Gun", false, function(v) state.autoPickupGun = v end)
-addToggle(pSheriff, "Silent Aim", false, function(v) state.silentAim = v end)
 addToggle(pSheriff, "Auto Shoot", false, function(v) state.autoShoot = v end)
 addToggle(pSheriff, "Auto Kill Murderer", false, function(v) state.autoKill = v end)
 
@@ -522,17 +485,15 @@ addToggle(pFarm, "Avoid Murderer", false, function(v) state.avoidMurderer = v en
 addToggle(pFarm, "Anti-Fling", false, function(v) state.antiFling = v end)
 
 local pFun = addTab("Troll Fun")
-addToggle(pFun, "Walk Speed", false, function(v) state.wsEnabled = v end)
-addSlider(pFun, "Speed Value", 16, 150, 16, function(v) state.ws = v end)
-addToggle(pFun, "Jump Power", false, function(v) state.jpEnabled = v end)
-addSlider(pFun, "Jump Value", 50, 200, 50, function(v) state.jp = v end)
 addToggle(pFun, "Touch Fling", false, function(v) state.touchFling = v end)
-addToggle(pFun, "Auto Emote", false, function(v) state.autoEmote = v end)
-addDropdown(pFun, "Select Emote", {"ninja", "zombie", "vampire", "robot", "floss", "zen"}, function(v) state.selectedEmote = v end)
+addDropdown(pFun, "Select Emote", {"ninja", "zen", "zombie", "floss", "sit", "dab", "vampire", "robot"}, function(v) state.selectedEmote = v end)
+addBtn(pFun, "Play Emote", function()
+    pcall(function()
+        ReplicatedStorage.Remotes.Misc.PlayEmote:FireServer(state.selectedEmote)
+    end)
+end)
 
 tabs["Main"].btn.MouseButton1Click:Fire()
-
--- === CORE ENGINE (Delta/Velocity Safe) ===
 
 local function getRole(player)
     local char = player.Character
@@ -552,148 +513,45 @@ local function getHum(player)
     return c and c:FindFirstChildOfClass("Humanoid")
 end
 
--- NoClip
-local noclipConn = nil
-local function setNoclip(enabled)
-    if enabled then
-        if noclipConn then return end
-        noclipConn = RunService.Stepped:Connect(function()
-            local c = LocalPlayer.Character
-            if not c then return end
-            for _, p in pairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = false
-                end
-            end
-        end)
-    else
-        if noclipConn then
-            noclipConn:Disconnect()
-            noclipConn = nil
-        end
-        local c = LocalPlayer.Character
-        if c then
-            for _, p in pairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = true
-                end
-            end
-        end
-    end
-end
-
--- Touch Fling
-local flingObj = nil
-local function setTouchFling(enabled)
-    local root = getRoot(LocalPlayer)
-    if not root then return end
-    if enabled then
-        if flingObj and flingObj.Parent then return end
-        flingObj = Instance.new("BodyAngularVelocity")
-        flingObj.AngularVelocity = Vector3.new(0, 99999, 0)
-        flingObj.MaxTorque = Vector3.new(0, math.huge, 0)
-        flingObj.Parent = root
-    else
-        if flingObj then
-            flingObj:Destroy()
-            flingObj = nil
-        end
-    end
-end
-
--- X-Ray
-local xrayCache = {}
-
-local function clearXray()
-    for part, orig in pairs(xrayCache) do
-        if part and part.Parent then
-            pcall(function() part.LocalTransparencyModifier = orig end)
-        end
-    end
-    for k in pairs(xrayCache) do xrayCache[k] = nil end
-end
-
-local function updateXray()
-    local char = LocalPlayer.Character
-    for _, p in pairs(Workspace:GetDescendants()) do
-        if p:IsA("BasePart") and not p:IsDescendantOf(char) and not p.Parent:FindFirstChildOfClass("Humanoid") then
-            if xrayCache[p] == nil then
-                xrayCache[p] = p.LocalTransparencyModifier
-            end
-            p.LocalTransparencyModifier = state.xrayStr
-        end
-    end
-end
-
--- Role ESP
 local espCache = {}
-
-local function clearEsp()
-    for player, data in pairs(espCache) do
-        if data and data.hl and data.hl.Parent then
-            data.hl:Destroy()
-        end
-    end
-    for k in pairs(espCache) do espCache[k] = nil end
-end
+local gunEspCache = {}
 
 local function updateRoleEsp()
     if not state.roleEsp then
-        clearEsp()
+        for k, v in pairs(espCache) do if v and v.Parent then v:Destroy() end end
+        table.clear(espCache)
         return
     end
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local char = p.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local role = getRole(p)
-                local color = Theme.success
-                if role == "Murderer" then
-                    color = Theme.danger
-                elseif role == "Sheriff" then
-                    color = Theme.sheriff
-                end
-                local cached = espCache[p]
-                if not cached or not cached.hl or not cached.hl.Parent or cached.lastRole ~= role then
-                    if cached and cached.hl and cached.hl.Parent then
-                        cached.hl:Destroy()
-                    end
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "KrevESP"
-                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    hl.FillTransparency = 0.5
-                    hl.OutlineTransparency = 0
-                    hl.FillColor = color
-                    hl.OutlineColor = color
-                    hl.Parent = char
-                    espCache[p] = {hl = hl, lastRole = role}
-                else
-                    cached.hl.FillColor = color
-                    cached.hl.OutlineColor = color
-                end
-            elseif espCache[p] then
-                if espCache[p].hl and espCache[p].hl.Parent then
-                    espCache[p].hl:Destroy()
-                end
-                espCache[p] = nil
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local role = getRole(p)
+            local color = Theme.success
+            if role == "Murderer" then color = Theme.danger elseif role == "Sheriff" then color = Theme.sheriff end
+            
+            if not espCache[p] then
+                local hl = Instance.new("Highlight")
+                hl.Name = "KrevESP"
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.FillTransparency = 0.5
+                hl.OutlineTransparency = 0
+                hl.Parent = p.Character
+                espCache[p] = hl
             end
+            if espCache[p] then
+                espCache[p].FillColor = color
+                espCache[p].OutlineColor = color
+                espCache[p].Parent = p.Character
+            end
+        else
+            if espCache[p] then espCache[p]:Destroy(); espCache[p] = nil end
         end
     end
-end
-
--- Gun ESP
-local gunEspCache = {}
-
-local function clearGunEsp()
-    for obj, hl in pairs(gunEspCache) do
-        if hl and hl.Parent then hl:Destroy() end
-    end
-    for k in pairs(gunEspCache) do gunEspCache[k] = nil end
 end
 
 local function updateGunEsp()
     if not state.gunEsp then
-        clearGunEsp()
+        for k, v in pairs(gunEspCache) do if v and v.Parent then v:Destroy() end end
+        table.clear(gunEspCache)
         return
     end
     for _, obj in pairs(Workspace:GetDescendants()) do
@@ -711,38 +569,92 @@ local function updateGunEsp()
     end
     for obj, hl in pairs(gunEspCache) do
         if not obj or not obj.Parent or obj.Name ~= "GunDrop" then
-            if hl and hl.Parent then hl:Destroy() end
+            if hl then hl:Destroy() end
             gunEspCache[obj] = nil
         end
     end
 end
 
-local lastNoclip = false
-local lastTouchFling = false
-local lastXray = false
-local lastRoleEsp = false
-local lastGunEsp = false
+RunService.RenderStepped:Connect(function(deltaTime)
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = getHum(LocalPlayer)
+    if hum then
+        if state.wsEnabled then
+            hum.WalkSpeed = state.ws
+        end
+        if state.jpEnabled then
+            hum.UseJumpPower = true
+            hum.JumpPower = state.jp
+        end
+        
+        if state.fly then
+            hum.PlatformStand = true
+            local root = getRoot(LocalPlayer)
+            if root then
+                local moveDir = hum.MoveDirection
+                local cam = Workspace.CurrentCamera.CFrame
+                local moveVector = Vector3.new()
+                
+                if moveDir.Magnitude > 0 then
+                    moveVector = (cam.LookVector * moveDir.Z * -1) + (cam.RightVector * moveDir.X)
+                end
+                
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    moveVector = moveVector + Vector3.new(0, 1, 0)
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    moveVector = moveVector + Vector3.new(0, -1, 0)
+                end
+                
+                local speed = state.wsEnabled and state.ws or 50
+                root.Velocity = moveVector * speed
+            end
+        else
+            if hum.PlatformStand and not state.noclip then
+                hum.PlatformStand = false
+            end
+        end
+    end
 
-RunService.Heartbeat:Connect(function()
-    if state.noclip ~= lastNoclip then
-        lastNoclip = state.noclip
-        setNoclip(state.noclip)
+    if state.xray then
+        for _, p in pairs(Workspace:GetDescendants()) do
+            if p:IsA("BasePart") and not p:IsDescendantOf(char) and not p.Parent:FindFirstChildOfClass("Humanoid") then
+                p.LocalTransparencyModifier = state.xrayStr
+            end
+        end
+    else
+        for _, p in pairs(Workspace:GetDescendants()) do
+            if p:IsA("BasePart") and p.LocalTransparencyModifier > 0 and not p:IsDescendantOf(char) then
+                p.LocalTransparencyModifier = 0
+            end
+        end
     end
-    if state.touchFling ~= lastTouchFling then
-        lastTouchFling = state.touchFling
-        setTouchFling(state.touchFling)
+end)
+
+RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    if state.noclip or state.fly then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then
+                v.CanCollide = false
+            end
+        end
     end
-    if state.xray ~= lastXray then
-        lastXray = state.xray
-        if not state.xray then clearXray() end
-    end
-    if state.roleEsp ~= lastRoleEsp then
-        lastRoleEsp = state.roleEsp
-        if not state.roleEsp then clearEsp() end
-    end
-    if state.gunEsp ~= lastGunEsp then
-        lastGunEsp = state.gunEsp
-        if not state.gunEsp then clearGunEsp() end
+
+    if state.antiFling then
+        local root = getRoot(LocalPlayer)
+        if root then
+            local vel = root.AssemblyLinearVelocity
+            if vel.Magnitude > 150 or root.AssemblyAngularVelocity.Magnitude > 50 then
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                root.RotVelocity = Vector3.new(0, 0, 0)
+            end
+        end
     end
 end)
 
@@ -753,71 +665,34 @@ task.spawn(function()
     end
 end)
 
-task.spawn(function()
-    while task.wait(1) do
-        if state.xray then
-            pcall(updateXray)
-        end
-    end
-end)
-
+local flingObj = nil
 RunService.Heartbeat:Connect(function()
-    local hum = getHum(LocalPlayer)
-    if not hum then return end
-    if state.wsEnabled then
-        hum.WalkSpeed = state.ws
-    end
-    if state.jpEnabled then
-        hum.JumpPower = state.jp
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if not state.antiFling then return end
-    local root = getRoot(LocalPlayer)
-    if not root then return end
-    local vel = root.AssemblyLinearVelocity
-    if vel.Magnitude > 150 or root.AssemblyAngularVelocity.Magnitude > 50 then
-        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        root.RotVelocity = Vector3.new(0, 0, 0)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(3) do
-        if state.autoRespawn then
-            if not LocalPlayer.Character or not getRoot(LocalPlayer) then
-                pcall(function() LocalPlayer:LoadCharacter() end)
-            end
+    if state.touchFling then
+        local root = getRoot(LocalPlayer)
+        if root and not flingObj then
+            flingObj = Instance.new("BodyAngularVelocity")
+            flingObj.AngularVelocity = Vector3.new(0, 99999, 0)
+            flingObj.MaxTorque = Vector3.new(0, math.huge, 0)
+            flingObj.Parent = root
         end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(3) do
-        if state.autoEmote then
-            pcall(function()
-                ReplicatedStorage.Remotes.Misc.PlayEmote:FireServer(state.selectedEmote)
-            end)
+    else
+        if flingObj then
+            flingObj:Destroy()
+            flingObj = nil
         end
     end
 end)
 
 local function getMurderer()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and getRole(p) == "Murderer" then
-            return p
-        end
+        if p ~= LocalPlayer and getRole(p) == "Murderer" then return p end
     end
     return nil
 end
 
 local function getSheriff()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and getRole(p) == "Sheriff" then
-            return p
-        end
+        if p ~= LocalPlayer and getRole(p) == "Sheriff" then return p end
     end
     return nil
 end
@@ -840,10 +715,8 @@ task.spawn(function()
                         if cont then
                             for _, coin in pairs(cont:GetChildren()) do
                                 if coin:IsA("BasePart") and (coin.Name == "Coin_Server" or coin.Name == "Coin") and coin.Transparency < 1 then
-                                    local tween = TweenService:Create(root, TweenInfo.new(0.4, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
-                                    tween:Play()
-                                    tween.Completed:Wait()
-                                    task.wait(0.1)
+                                    root.CFrame = coin.CFrame
+                                    task.wait(0.15)
                                     break
                                 end
                             end
@@ -862,9 +735,7 @@ task.spawn(function()
                         end
                     end
                     if gun then
-                        local tween = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {CFrame = gun.CFrame})
-                        tween:Play()
-                        tween.Completed:Wait()
+                        root.CFrame = gun.CFrame
                         task.wait(0.2)
                     end
                 end)
@@ -962,17 +833,5 @@ task.spawn(function()
                 end)
             end
         end
-    end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    if not state.noclip and noclipConn then
-        noclipConn:Disconnect()
-        noclipConn = nil
-    end
-    if not state.touchFling and flingObj then
-        flingObj:Destroy()
-        flingObj = nil
     end
 end)
